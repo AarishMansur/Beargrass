@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # --- OpenStreetMap (privacy-preserving, no proprietary map APIs) ---
     nominatim_base_url: str = "https://nominatim.openstreetmap.org"
     overpass_base_url: str = "https://overpass-api.de/api/interpreter"
-    osrm_base_url: str = "https://router.project-osrm.org"
+    osrm_base_url: str = "https://routing.openstreetmap.de/routed-foot"
     osm_user_agent: str = "TouchGrassAgent/1.0 (open-source hackathon project)"
     osm_search_limit: int = Field(default=5, ge=1, le=25)
     osm_nearby_radius_m: int = Field(default=1500, ge=200, le=20000)
