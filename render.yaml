@@ -1,2 +1,42 @@
-# Render Blueprint — Touch Grass Agent
-# Full specification is completed in Phase 4 (deployment & documentation).
+services:
+  # Touch Grass Agent — single web service (monolith).
+  # FastAPI app + Hermes tool-calling engine + OpenStreetMap clients, all in
+  # one deployable unit. See README.md for the architecture breakdown.
+  - type: web
+    name: touch-grass-agent
+    runtime: python
+    plan: free
+    region: frankfurt
+    numInstances: 1
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level ${LOG_LEVEL:-info}
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      # --- Hermes engine (any OpenAI-compatible endpoint) ---
+      - key: LLM_BASE_URL
+        value: https://openrouter.ai/api/v1
+      - key: LLM_MODEL
+        value: nousresearch/hermes-3-llama-3.1-405b
+      - key: LLM_API_KEY
+        sync: false # set in the Render dashboard; never committed
+      # Keep the API useful before an LLM key is added: a deterministic
+      # local planner answers with the same OSM-backed action plan.
+      - key: ALLOW_OFFLINE_PLANNER
+        value: "true"
+      # --- OpenStreetMap (free, keyless, privacy-preserving) ---
+      - key: OSM_USER_AGENT
+        value: "TouchGrassAgent/1.0 (open-source hackathon project)"
+      - key: OSM_NEARBY_RADIUS_M
+        value: "1500"
+      - key: OSM_CACHE_TTL_SECONDS
+        value: "300"
+      # --- API surface ---
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: SCREEN_TIME_THRESHOLD_MINUTES
+        value: "120"
+      - key: LOG_LEVEL
+        value: info
