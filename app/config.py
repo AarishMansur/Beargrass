@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -55,7 +56,8 @@ class Settings(BaseSettings):
     # --- Server ---
     host: str = "0.0.0.0"
     port: int = 8000
-    cors_origins: list[str] = ["*"]
+    # NoDecode: .env files carry this as `CORS_ORIGINS=*`, not JSON.
+    cors_origins: Annotated[list[str], NoDecode] = Field(default=["*"])
 
     @field_validator("cors_origins", mode="before")
     @classmethod
