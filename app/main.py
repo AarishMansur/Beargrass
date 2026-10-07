@@ -62,6 +62,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "model": settings.llm_model,
         }
 
+    from app.routes import router as api_router
+
+    application.include_router(api_router, prefix=settings.api_prefix)
     return application
 
 
