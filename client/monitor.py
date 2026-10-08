@@ -31,7 +31,29 @@ from pathlib import Path
 if __package__ in (None, ""):  # executed as `python client/monitor.py`
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from client import alerts
 from client.tracker import ActiveTimeTracker, get_idle_seconds
+
+
+def load_dotenv(path: Path) -> None:
+    """Minimal .env reader (KEY=VALUE) so the client honours the same file
+    as the server. Never overrides variables already set in the shell."""
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, _, value = stripped.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 DEFAULT_ENDPOINT = os.getenv(
     "TRIGGER_ENDPOINT", "http://127.0.0.1:8000/api/v1/trigger"
@@ -51,6 +73,7 @@ class Config:
     simulate_speed: float = 60.0  # 1 real second counts as 60 active seconds
     once: bool = False
     dry_run: bool = False
+    alert: str = "auto"
     timeout: float = 60.0
 
 
@@ -105,6 +128,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print the payload instead of sending it.",
     )
     parser.add_argument(
+        "--alert",
+        choices=alerts.ALERT_STYLES,
+        default="auto",
+        help="Desktop notification style when the threshold trips (default: auto).",
+    )
+    parser.add_argument(
         "--timeout", type=float, default=60.0, help="HTTP timeout in seconds."
     )
     return parser
@@ -122,6 +151,7 @@ def load_config(argv: list[str] | None = None) -> Config:
         simulate_speed=args.simulate_speed,
         once=args.once,
         dry_run=args.dry_run,
+        alert=args.alert,
         timeout=args.timeout,
     )
     if args.lat is not None:
@@ -237,6 +267,10 @@ def _send(config: Config, minutes: int) -> int:
 
     print(format_plan(result))
     print(f"[touch-grass] powered by {result.get('model_used', 'unknown')} / {result.get('data_source', 'OSM')}")
+
+    title, body = alerts.format_alert(result)
+    shown = alerts.notify(title, body, style=config.alert)
+    print(f"[touch-grass] desktop alert: {shown}")
     return 0
 
 

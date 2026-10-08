@@ -29,8 +29,9 @@ Touch-grass/
 │       └── osm.py              # Nominatim + Overpass + OSRM wrappers (keyless)
 ├── client/                     # ── LOCAL TRIGGER (stdlib only, no pip install)
 │   ├── tracker.py              # cross-platform active/idle time accounting
-│   └── monitor.py              # sampling loop -> POST alert to the backend
-├── tests/                      # 46 unit/integration tests (network mocked)
+│   ├── alerts.py               # native toasts / balloons / dialogs
+│   └── monitor.py              # sampling loop -> POST alert -> desktop notification
+├── tests/                      # 57 unit/integration tests (network mocked)
 ├── render.yaml                 # Render Blueprint (single Python Web Service)
 ├── requirements.txt            # server dependencies
 ├── pyproject.toml              # package metadata + pytest config
@@ -106,11 +107,17 @@ LLM_MODEL=hermes3
 
 ```bash
 python client/monitor.py                                  # real tracking, 2h threshold
-python client/monitor.py --once                           # fire one trigger now
+python client/monitor.py --once                           # fire one trigger + desktop alert now
 python client/monitor.py --dry-run --once                 # inspect the payload
 python client/monitor.py --simulate --threshold-minutes 1 --interval 1
 python client/monitor.py --lat 40.7580 --lon -73.9855 --preferences quiet,coffee
+python client/monitor.py --alert dialog                   # force a blocking popup (toast/balloon/dialog/none)
 ```
+
+When the threshold trips, the client POSTs your coordinates and the reply —
+a **real place name plus walking route** — is shown as a native desktop
+notification: a Windows toast, falling back to a balloon tip, then a blocking
+MessageBox (`client/alerts.py`; `notify-send` on Linux, `osascript` on macOS).
 
 Environment knobs: `TRIGGER_ENDPOINT`, `DEFAULT_LAT`, `DEFAULT_LON`,
 `SCREEN_TIME_THRESHOLD_MIN` (see `.env.example`).
@@ -149,7 +156,7 @@ Interactive docs: `/docs` (Swagger UI).
 
 ```bash
 pip install -r requirements.txt
-python -m pytest        # 46 tests: agent, OSM parsers, client, blueprint
+python -m pytest        # 57 tests: agent, OSM parsers, client, blueprint
 ```
 
 ### 6. Deploy on Render

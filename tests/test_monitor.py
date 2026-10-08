@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
@@ -18,12 +19,41 @@ SAMPLE_RESULT = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _no_desktop_popups(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests must never raise real Windows toasts."""
+    monkeypatch.setattr(monitor.alerts, "notify", lambda *a, **k: "none")
+
+
 def test_load_config_defaults() -> None:
     config = monitor.load_config([])
     assert config.endpoint.startswith("http")
     assert config.threshold_minutes == 120
     assert config.preferences == []
     assert -90 <= config.latitude <= 90
+
+
+def test_load_dotenv_reads_file_but_never_overrides_shell(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        '# comment\nDEFAULT_LAT=25.1737019\nDEFAULT_LON=75.8574194\n'
+        'TRIGGER_ENDPOINT="http://example.test/trigger"\nMALFORMED LINE\n',
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("DEFAULT_LAT", raising=False)
+    monkeypatch.delenv("DEFAULT_LON", raising=False)
+    monkeypatch.setenv("TRIGGER_ENDPOINT", "http://shell-wins.test/trigger")
+
+    monitor.load_dotenv(env_file)
+    assert os.environ["DEFAULT_LAT"] == "25.1737019"
+    assert os.environ["DEFAULT_LON"] == "75.8574194"
+    assert os.environ["TRIGGER_ENDPOINT"] == "http://shell-wins.test/trigger"
+
+
+def test_load_dotenv_tolerates_missing_file(tmp_path) -> None:
+    monitor.load_dotenv(tmp_path / "nope.env")  # must not raise
 
 
 def test_load_config_cli_overrides() -> None:
@@ -86,6 +116,40 @@ def test_backend_unreachable_returns_error_code(
     monkeypatch.setattr(monitor, "post_json", fail)
     assert monitor.main(["--once"]) == 1
     assert "could not reach backend" in capsys.readouterr().err
+
+
+def test_trigger_shows_desktop_alert_with_place_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shown: list[tuple[str, str]] = []
+
+    def fake_post(url: str, payload: dict, timeout: float) -> dict:
+        return SAMPLE_RESULT
+
+    def fake_notify(title: str, body: str, style: str = "auto") -> str:
+        shown.append((title, body))
+        return "toast"
+
+    monkeypatch.setattr(monitor, "post_json", fake_post)
+    monkeypatch.setattr(monitor.alerts, "notify", fake_notify)
+    assert monitor.main(["--once"]) == 0
+    assert len(shown) == 1
+    title, body = shown[0]
+    assert title == "Go touch grass."
+    assert "Bryant Park" in body  # a real place name, not coordinates
+    assert "640 m" in body
+
+
+def test_alert_style_flag_is_passed_through(monkeypatch: pytest.MonkeyPatch) -> None:
+    styles: list[str] = []
+    monkeypatch.setattr(monitor, "post_json", lambda *a: SAMPLE_RESULT)
+    monkeypatch.setattr(
+        monitor.alerts,
+        "notify",
+        lambda t, b, style="auto": styles.append(style) or "dialog",
+    )
+    assert monitor.main(["--once", "--alert", "dialog"]) == 0
+    assert styles == ["dialog"]
 
 
 def test_format_plan_includes_place_and_route() -> None:
