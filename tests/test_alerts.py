@@ -9,8 +9,8 @@ from client import alerts
 RESULT = {
     "headline": "Go touch grass.",
     "plan": "Walk 640 m to Bryant Park. Phone stays in your pocket.",
-    "place": {"name": "Bryant Park"},
-    "route": {"distance_m": 640, "duration_min": 8.0},
+    "place": {"name": "Shivaji Park"},
+    "route": {"distance_m": 640, "duration_min": 10.0},
 }
 
 
